@@ -5,6 +5,9 @@ import Icon from '@/components/ui/icon';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, subDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -103,6 +106,8 @@ const Index = () => {
   });
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [newPrice, setNewPrice] = useState<string>('');
 
   useEffect(() => {
     localStorage.setItem('bakery-sales', JSON.stringify(products));
@@ -111,6 +116,28 @@ const Index = () => {
   useEffect(() => {
     localStorage.setItem('bakery-sales-history', JSON.stringify(salesHistory));
   }, [salesHistory]);
+
+  const updatePrice = (id: number, price: number) => {
+    setProducts(prev =>
+      prev.map(p => p.id === id ? { ...p, price } : p)
+    );
+  };
+
+  const openPriceEditor = (product: Product) => {
+    setEditingProduct(product);
+    setNewPrice(product.price.toString());
+  };
+
+  const savePriceEdit = () => {
+    if (editingProduct && newPrice) {
+      const price = parseFloat(newPrice);
+      if (!isNaN(price) && price > 0) {
+        updatePrice(editingProduct.id, price);
+        setEditingProduct(null);
+        setNewPrice('');
+      }
+    }
+  };
 
   const updateSales = (id: number, delta: number) => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -361,12 +388,17 @@ const Index = () => {
                         <h3 className="font-medium text-gray-800 text-xs md:text-sm leading-tight mb-1.5 line-clamp-2">
                           {product.name}
                         </h3>
-                        <div className="flex gap-1.5 md:gap-2 flex-wrap">
+                        <div className="flex gap-1.5 md:gap-2 flex-wrap items-center">
                           <Badge variant="outline" className="text-[10px] md:text-xs bg-amber-50 border-amber-300 text-amber-700 px-1.5 py-0.5">
                             {product.category}
                           </Badge>
-                          <Badge variant="outline" className="text-[10px] md:text-xs bg-green-50 border-green-300 text-green-700 font-semibold px-1.5 py-0.5">
+                          <Badge 
+                            variant="outline" 
+                            className="text-[10px] md:text-xs bg-green-50 border-green-300 text-green-700 font-semibold px-1.5 py-0.5 cursor-pointer hover:bg-green-100 transition-colors"
+                            onClick={() => openPriceEditor(product)}
+                          >
                             {product.price} ₽
+                            <Icon name="Pencil" size={10} className="ml-1 inline" />
                           </Badge>
                         </div>
                       </div>
@@ -545,6 +577,62 @@ const Index = () => {
             </div>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <span className="text-3xl">{editingProduct?.emoji}</span>
+                Изменить цену товара
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-600">Товар</Label>
+                <p className="font-medium text-gray-900">{editingProduct?.name}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price" className="text-sm text-gray-600">Текущая цена</Label>
+                <p className="font-semibold text-orange-600 text-lg">{editingProduct?.price} ₽</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPrice">Новая цена (₽)</Label>
+                <Input
+                  id="newPrice"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={newPrice}
+                  onChange={(e) => setNewPrice(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      savePriceEdit();
+                    }
+                  }}
+                  className="text-lg font-semibold"
+                  placeholder="Введите новую цену"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEditingProduct(null)}
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={savePriceEdit}
+                className="bg-green-500 hover:bg-green-600"
+                disabled={!newPrice || parseFloat(newPrice) <= 0}
+              >
+                <Icon name="Check" size={16} className="mr-2" />
+                Сохранить
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
