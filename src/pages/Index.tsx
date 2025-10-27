@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { format, subDays } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 
 interface Product {
@@ -13,6 +17,17 @@ interface Product {
   emoji: string;
   sales: number;
   price: number;
+}
+
+interface DailyStats {
+  date: string;
+  sales: number;
+  revenue: number;
+  productsSold: { [key: number]: number };
+}
+
+interface SalesHistory {
+  [dateKey: string]: DailyStats;
 }
 
 const INITIAL_PRODUCTS: Product[] = [
@@ -81,6 +96,11 @@ const Index = () => {
     const saved = localStorage.getItem('bakery-sales');
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
   });
+
+  const [salesHistory, setSalesHistory] = useState<SalesHistory>(() => {
+    const saved = localStorage.getItem('bakery-sales-history');
+    return saved ? JSON.parse(saved) : {};
+  });
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -88,7 +108,38 @@ const Index = () => {
     localStorage.setItem('bakery-sales', JSON.stringify(products));
   }, [products]);
 
+  useEffect(() => {
+    localStorage.setItem('bakery-sales-history', JSON.stringify(salesHistory));
+  }, [salesHistory]);
+
   const updateSales = (id: number, delta: number) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const product = products.find(p => p.id === id);
+    
+    if (delta > 0 && product) {
+      setSalesHistory(prev => {
+        const todayStats = prev[today] || {
+          date: today,
+          sales: 0,
+          revenue: 0,
+          productsSold: {}
+        };
+        
+        return {
+          ...prev,
+          [today]: {
+            ...todayStats,
+            sales: todayStats.sales + delta,
+            revenue: todayStats.revenue + (product.price * delta),
+            productsSold: {
+              ...todayStats.productsSold,
+              [id]: (todayStats.productsSold[id] || 0) + delta
+            }
+          }
+        };
+      });
+    }
+
     setProducts(prev =>
       prev.map(p => p.id === id ? { ...p, sales: Math.max(0, p.sales + delta) } : p)
     );
@@ -115,6 +166,33 @@ const Index = () => {
     const maxCategorySales = Math.max(...categorySales.map(c => c.sales), 1);
     
     return { totalSales, totalRevenue, topProducts, categorySales, maxCategorySales };
+  }, [products, categories]);
+
+  const chartData = useMemo(() => {
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = subDays(new Date(), 6 - i);
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const dayStats = salesHistory[dateKey] || { sales: 0, revenue: 0 };
+      
+      return {
+        date: format(date, 'dd MMM', { locale: ru }),
+        sales: dayStats.sales,
+        revenue: dayStats.revenue
+      };
+    });
+    
+    return last7Days;
+  }, [salesHistory]);
+
+  const categoryRevenueData = useMemo(() => {
+    return categories.map(cat => {
+      const catProducts = products.filter(p => p.category === cat);
+      const revenue = catProducts.reduce((sum, p) => sum + (p.sales * p.price), 0);
+      return {
+        category: cat,
+        revenue
+      };
+    }).sort((a, b) => b.revenue - a.revenue);
   }, [products, categories]);
 
   const resetSales = () => {
@@ -160,179 +238,313 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-8 animate-fade-in">
-          <h1 className="text-5xl md:text-6xl font-heading font-bold text-orange-600 mb-2">
-            🥐 Учёт продаж пекарни
-          </h1>
-          <p className="text-gray-600 text-lg">Отслеживайте популярность каждого товара</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-orange-50 to-amber-50 p-3 md:p-6 lg:p-8">
+      <div className="max-w-[1800px] mx-auto">
+        <header className="mb-6 md:mb-8 animate-fade-in flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold bg-gradient-to-r from-orange-600 to-amber-500 bg-clip-text text-transparent mb-2">
+              🥐 Учёт продаж пекарни
+            </h1>
+            <p className="text-gray-600 text-base md:text-lg">Отслеживайте популярность каждого товара</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={exportToExcel}
+              className="gap-2 bg-green-500 hover:bg-green-600 shadow-lg"
+            >
+              <Icon name="Download" size={18} />
+              <span className="hidden sm:inline">Экспорт</span>
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={resetSales}
+              className="gap-2 shadow-lg"
+            >
+              <Icon name="RotateCcw" size={18} />
+              <span className="hidden sm:inline">Сбросить</span>
+            </Button>
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/80 backdrop-blur-sm border-orange-200 shadow-lg animate-scale-in">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-600">Всего продаж</span>
-                <Icon name="TrendingUp" className="text-orange-500" size={24} />
-              </div>
-              <p className="text-4xl font-heading font-bold text-orange-600">{stats.totalSales}</p>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="sales" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6 h-auto p-1 bg-white/60 backdrop-blur-sm">
+            <TabsTrigger value="sales" className="text-sm md:text-base py-2 md:py-3 data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+              <Icon name="ShoppingCart" size={18} className="mr-2" />
+              Продажи
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="text-sm md:text-base py-2 md:py-3 data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+              <Icon name="BarChart3" size={18} className="mr-2" />
+              Аналитика
+            </TabsTrigger>
+          </TabsList>
 
-          <Card className="bg-white/80 backdrop-blur-sm border-green-200 shadow-lg animate-scale-in" style={{ animationDelay: '0.05s' }}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-600">Выручка</span>
-                <Icon name="DollarSign" className="text-green-500" size={24} />
-              </div>
-              <p className="text-3xl font-heading font-bold text-green-600">{stats.totalRevenue.toLocaleString('ru-RU')} ₽</p>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-2 bg-white/80 backdrop-blur-sm border-purple-200 shadow-lg animate-scale-in" style={{ animationDelay: '0.15s' }}>
-            <CardContent className="p-6">
-              <h3 className="font-heading font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                <Icon name="Award" className="text-purple-500" size={20} />
-                Топ-3 товара
-              </h3>
-              <div className="space-y-3">
-                {stats.topProducts.map((product, index) => (
-                  <div key={product.id} className="flex items-center gap-3">
-                    <Badge className="text-2xl bg-purple-100 hover:bg-purple-100 text-purple-800 font-heading">
-                      {index + 1}
-                    </Badge>
-                    <span className="text-2xl">{product.emoji}</span>
-                    <span className="flex-1 font-medium text-gray-700">{product.name}</span>
-                    <Badge variant="secondary" className="bg-purple-50 text-purple-700">
-                      {product.sales}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="bg-white/80 backdrop-blur-sm border-orange-200 shadow-lg mb-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <CardContent className="p-6">
-            <h3 className="font-heading font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <Icon name="BarChart3" className="text-orange-500" size={20} />
-              Продажи по категориям
-            </h3>
-            <div className="space-y-4">
-              {stats.categorySales.map(({ category, sales }) => (
-                <div key={category}>
+          <TabsContent value="sales" className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+              <Card className="bg-white/90 backdrop-blur-sm border-orange-200 shadow-lg animate-scale-in hover:shadow-xl transition-shadow">
+                <CardContent className="p-4 md:p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-700 flex items-center gap-2">
-                      <span className="text-xl">{CATEGORY_EMOJIS[category as keyof typeof CATEGORY_EMOJIS]}</span>
-                      {category}
-                    </span>
-                    <span className="text-orange-600 font-semibold">{sales}</span>
+                    <span className="text-gray-600 text-xs md:text-sm">Всего продаж</span>
+                    <Icon name="TrendingUp" className="text-orange-500" size={20} />
                   </div>
-                  <Progress 
-                    value={(sales / stats.maxCategorySales) * 100} 
-                    className="h-2"
-                  />
-                </div>
+                  <p className="text-2xl md:text-4xl font-heading font-bold text-orange-600">{stats.totalSales}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/90 backdrop-blur-sm border-green-200 shadow-lg animate-scale-in hover:shadow-xl transition-shadow" style={{ animationDelay: '0.05s' }}>
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-600 text-xs md:text-sm">Выручка</span>
+                    <Icon name="DollarSign" className="text-green-500" size={20} />
+                  </div>
+                  <p className="text-xl md:text-3xl font-heading font-bold text-green-600">{stats.totalRevenue.toLocaleString('ru-RU')} ₽</p>
+                </CardContent>
+              </Card>
+
+              <Card className="col-span-2 bg-white/90 backdrop-blur-sm border-purple-200 shadow-lg animate-scale-in hover:shadow-xl transition-shadow" style={{ animationDelay: '0.1s' }}>
+                <CardContent className="p-4 md:p-6">
+                  <h3 className="font-heading font-semibold text-gray-700 mb-3 md:mb-4 flex items-center gap-2 text-sm md:text-base">
+                    <Icon name="Award" className="text-purple-500" size={20} />
+                    Топ-3 товара
+                  </h3>
+                  <div className="space-y-2 md:space-y-3">
+                    {stats.topProducts.map((product, index) => (
+                      <div key={product.id} className="flex items-center gap-2 md:gap-3">
+                        <Badge className="text-base md:text-2xl bg-purple-100 hover:bg-purple-100 text-purple-800 font-heading px-2 py-1">
+                          {index + 1}
+                        </Badge>
+                        <span className="text-lg md:text-2xl">{product.emoji}</span>
+                        <span className="flex-1 font-medium text-gray-700 text-xs md:text-base truncate">{product.name}</span>
+                        <Badge variant="secondary" className="bg-purple-50 text-purple-700 text-xs md:text-sm">
+                          {product.sales}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex gap-2 md:gap-3 overflow-x-auto pb-2 scrollbar-hide animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              <Button
+                size="sm"
+                variant={selectedCategory === null ? 'default' : 'outline'}
+                onClick={() => setSelectedCategory(null)}
+                className="whitespace-nowrap text-xs md:text-sm shrink-0"
+              >
+                Все товары
+              </Button>
+              {categories.map(cat => (
+                <Button
+                  key={cat}
+                  size="sm"
+                  variant={selectedCategory === cat ? 'default' : 'outline'}
+                  onClick={() => setSelectedCategory(cat)}
+                  className="whitespace-nowrap gap-1.5 md:gap-2 text-xs md:text-sm shrink-0"
+                >
+                  <span>{CATEGORY_EMOJIS[cat as keyof typeof CATEGORY_EMOJIS]}</span>
+                  <span className="hidden sm:inline">{cat}</span>
+                </Button>
               ))}
             </div>
-          </CardContent>
-        </Card>
 
-        <div className="flex gap-3 mb-6 overflow-x-auto pb-2 animate-fade-in" style={{ animationDelay: '0.3s' }}>
-          <Button
-            variant={selectedCategory === null ? 'default' : 'outline'}
-            onClick={() => setSelectedCategory(null)}
-            className="whitespace-nowrap"
-          >
-            Все товары
-          </Button>
-          {categories.map(cat => (
-            <Button
-              key={cat}
-              variant={selectedCategory === cat ? 'default' : 'outline'}
-              onClick={() => setSelectedCategory(cat)}
-              className="whitespace-nowrap gap-2"
-            >
-              <span>{CATEGORY_EMOJIS[cat as keyof typeof CATEGORY_EMOJIS]}</span>
-              {cat}
-            </Button>
-          ))}
-          <Button
-            onClick={exportToExcel}
-            className="whitespace-nowrap ml-auto gap-2 bg-green-500 hover:bg-green-600"
-          >
-            <Icon name="Download" size={16} />
-            Экспорт в Excel
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={resetSales}
-            className="whitespace-nowrap gap-2"
-          >
-            <Icon name="RotateCcw" size={16} />
-            Сбросить
-          </Button>
-        </div>
-
-        <div className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
-          {filteredProducts.map((product, index) => (
-            <Card 
-              key={product.id} 
-              className="break-inside-avoid bg-white/90 backdrop-blur-sm border-amber-200 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.02] animate-fade-in group"
-              style={{ animationDelay: `${0.4 + index * 0.02}s` }}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="text-4xl mb-2">{product.emoji}</div>
-                    <h3 className="font-medium text-gray-800 text-sm leading-tight mb-1">
-                      {product.name}
-                    </h3>
-                    <div className="flex gap-2 flex-wrap">
-                      <Badge variant="outline" className="text-xs bg-amber-50 border-amber-300 text-amber-700">
-                        {product.category}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs bg-green-50 border-green-300 text-green-700 font-semibold">
-                        {product.price} ₽
-                      </Badge>
+            <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 gap-3 md:gap-4 space-y-3 md:space-y-4">
+              {filteredProducts.map((product, index) => (
+                <Card 
+                  key={product.id} 
+                  className="break-inside-avoid bg-white/95 backdrop-blur-sm border-amber-200 shadow-md hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] animate-fade-in group"
+                  style={{ animationDelay: `${0.3 + index * 0.01}s` }}
+                >
+                  <CardContent className="p-3 md:p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-3xl md:text-4xl mb-2">{product.emoji}</div>
+                        <h3 className="font-medium text-gray-800 text-xs md:text-sm leading-tight mb-1.5 line-clamp-2">
+                          {product.name}
+                        </h3>
+                        <div className="flex gap-1.5 md:gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-[10px] md:text-xs bg-amber-50 border-amber-300 text-amber-700 px-1.5 py-0.5">
+                            {product.category}
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px] md:text-xs bg-green-50 border-green-300 text-green-700 font-semibold px-1.5 py-0.5">
+                            {product.price} ₽
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 ml-2">
+                        <Badge className="bg-orange-500 hover:bg-orange-600 text-white font-heading text-base md:text-lg px-2 md:px-3 py-1">
+                          {product.sales}
+                        </Badge>
+                        {product.sales > 0 && (
+                          <span className="text-[10px] md:text-xs text-green-600 font-semibold">
+                            {(product.sales * product.price).toLocaleString('ru-RU')} ₽
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateSales(product.id, -1)}
+                        disabled={product.sales === 0}
+                        className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-400 transition-all h-9 md:h-10 active:scale-95"
+                      >
+                        <Icon name="Minus" size={16} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => updateSales(product.id, 1)}
+                        className="flex-1 bg-orange-500 hover:bg-orange-600 text-white shadow-md hover:shadow-lg transition-all h-9 md:h-10 active:scale-95"
+                      >
+                        <Icon name="Plus" size={16} />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-white/90 backdrop-blur-sm shadow-xl border-purple-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <Icon name="TrendingUp" className="text-purple-500" size={24} />
+                    Динамика продаж за 7 дней
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                        }}
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="sales" 
+                        stroke="#f97316" 
+                        strokeWidth={3}
+                        name="Продажи (шт)" 
+                        dot={{ fill: '#f97316', r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/90 backdrop-blur-sm shadow-xl border-green-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <Icon name="DollarSign" className="text-green-500" size={24} />
+                    Динамика выручки за 7 дней
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                        }}
+                        formatter={(value: number) => `${value.toLocaleString('ru-RU')} ₽`}
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#22c55e" 
+                        strokeWidth={3}
+                        name="Выручка (₽)" 
+                        dot={{ fill: '#22c55e', r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/90 backdrop-blur-sm shadow-xl border-orange-200 lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <Icon name="BarChart3" className="text-orange-500" size={24} />
+                    Выручка по категориям
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={categoryRevenueData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="category" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                        }}
+                        formatter={(value: number) => `${value.toLocaleString('ru-RU')} ₽`}
+                      />
+                      <Legend />
+                      <Bar 
+                        dataKey="revenue" 
+                        fill="#f97316" 
+                        name="Выручка (₽)"
+                        radius={[8, 8, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/90 backdrop-blur-sm shadow-xl border-amber-200 lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                    <Icon name="PieChart" className="text-amber-500" size={24} />
+                    Продажи по категориям
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {stats.categorySales.map(({ category, sales }) => (
+                      <div key={category}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-gray-700 flex items-center gap-2 text-sm md:text-base">
+                            <span className="text-xl md:text-2xl">{CATEGORY_EMOJIS[category as keyof typeof CATEGORY_EMOJIS]}</span>
+                            {category}
+                          </span>
+                          <span className="text-orange-600 font-semibold text-sm md:text-base">{sales} шт</span>
+                        </div>
+                        <Progress 
+                          value={(sales / stats.maxCategorySales) * 100} 
+                          className="h-3"
+                        />
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <Badge className="bg-orange-500 hover:bg-orange-600 text-white font-heading text-lg px-3 py-1">
-                      {product.sales}
-                    </Badge>
-                    {product.sales > 0 && (
-                      <span className="text-xs text-green-600 font-semibold">
-                        {(product.sales * product.price).toLocaleString('ru-RU')} ₽
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex gap-2 mt-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => updateSales(product.id, -1)}
-                    disabled={product.sales === 0}
-                    className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50 hover:border-orange-400 transition-all"
-                  >
-                    <Icon name="Minus" size={16} />
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => updateSales(product.id, 1)}
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white shadow-md hover:shadow-lg transition-all animate-pulse-soft"
-                  >
-                    <Icon name="Plus" size={16} />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
