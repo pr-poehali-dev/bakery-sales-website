@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import Icon from '@/components/ui/icon';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import * as XLSX from 'xlsx';
 
 interface Product {
   id: number;
@@ -11,59 +12,60 @@ interface Product {
   category: string;
   emoji: string;
   sales: number;
+  price: number;
 }
 
 const INITIAL_PRODUCTS: Product[] = [
-  { id: 1, name: 'Пирожок с капустой', category: 'Пирожки', emoji: '🥟', sales: 0 },
-  { id: 2, name: 'Пирожок с картошкой', category: 'Пирожки', emoji: '🥔', sales: 0 },
-  { id: 3, name: 'Пирожок с мясом', category: 'Пирожки', emoji: '🥩', sales: 0 },
-  { id: 4, name: 'Чебурек с мясом', category: 'Пирожки', emoji: '🌮', sales: 0 },
-  { id: 5, name: 'Чебурек с сыром', category: 'Пирожки', emoji: '🧀', sales: 0 },
-  { id: 6, name: 'Хачапури с сыром', category: 'Пирожки', emoji: '🍕', sales: 0 },
-  { id: 7, name: 'Хачапури с сыром и зеленью', category: 'Пирожки', emoji: '🥬', sales: 0 },
-  { id: 8, name: 'Хачапури с мясом', category: 'Пирожки', emoji: '🍖', sales: 0 },
-  { id: 9, name: 'Матнакаш', category: 'Пирожки', emoji: '🍞', sales: 0 },
-  { id: 10, name: 'Армянский тонкий лаваш', category: 'Пирожки', emoji: '🫓', sales: 0 },
-  { id: 11, name: 'Хлеб ржаной', category: 'Пирожки', emoji: '🍞', sales: 0 },
-  { id: 12, name: 'Хлеб рижский', category: 'Пирожки', emoji: '🥖', sales: 0 },
-  { id: 13, name: 'Хлеб черный с семечками', category: 'Пирожки', emoji: '🌾', sales: 0 },
+  { id: 1, name: 'Пирожок с капустой', category: 'Пирожки', emoji: '🥟', sales: 0, price: 45 },
+  { id: 2, name: 'Пирожок с картошкой', category: 'Пирожки', emoji: '🥔', sales: 0, price: 45 },
+  { id: 3, name: 'Пирожок с мясом', category: 'Пирожки', emoji: '🥩', sales: 0, price: 55 },
+  { id: 4, name: 'Чебурек с мясом', category: 'Пирожки', emoji: '🌮', sales: 0, price: 80 },
+  { id: 5, name: 'Чебурек с сыром', category: 'Пирожки', emoji: '🧀', sales: 0, price: 75 },
+  { id: 6, name: 'Хачапури с сыром', category: 'Пирожки', emoji: '🍕', sales: 0, price: 120 },
+  { id: 7, name: 'Хачапури с сыром и зеленью', category: 'Пирожки', emoji: '🥬', sales: 0, price: 130 },
+  { id: 8, name: 'Хачапури с мясом', category: 'Пирожки', emoji: '🍖', sales: 0, price: 140 },
+  { id: 9, name: 'Матнакаш', category: 'Пирожки', emoji: '🍞', sales: 0, price: 90 },
+  { id: 10, name: 'Армянский тонкий лаваш', category: 'Пирожки', emoji: '🫓', sales: 0, price: 60 },
+  { id: 11, name: 'Хлеб ржаной', category: 'Пирожки', emoji: '🍞', sales: 0, price: 50 },
+  { id: 12, name: 'Хлеб рижский', category: 'Пирожки', emoji: '🥖', sales: 0, price: 55 },
+  { id: 13, name: 'Хлеб черный с семечками', category: 'Пирожки', emoji: '🌾', sales: 0, price: 60 },
   
-  { id: 14, name: 'Эспрессо', category: 'Кофе и Чай', emoji: '☕', sales: 0 },
-  { id: 15, name: 'Капучино', category: 'Кофе и Чай', emoji: '☕', sales: 0 },
-  { id: 16, name: 'Латте', category: 'Кофе и Чай', emoji: '🥛', sales: 0 },
-  { id: 17, name: 'Американо', category: 'Кофе и Чай', emoji: '☕', sales: 0 },
-  { id: 18, name: 'Флэт уайт', category: 'Кофе и Чай', emoji: '🤍', sales: 0 },
-  { id: 19, name: 'Раф', category: 'Кофе и Чай', emoji: '☕', sales: 0 },
-  { id: 20, name: 'Кофе на песке', category: 'Кофе и Чай', emoji: '🏖️', sales: 0 },
-  { id: 21, name: 'Чай пакетированный', category: 'Кофе и Чай', emoji: '🍵', sales: 0 },
-  { id: 22, name: 'Лавандовый раф', category: 'Кофе и Чай', emoji: '💜', sales: 0 },
-  { id: 23, name: 'Облепиховый чай', category: 'Кофе и Чай', emoji: '🍊', sales: 0 },
+  { id: 14, name: 'Эспрессо', category: 'Кофе и Чай', emoji: '☕', sales: 0, price: 80 },
+  { id: 15, name: 'Капучино', category: 'Кофе и Чай', emoji: '☕', sales: 0, price: 120 },
+  { id: 16, name: 'Латте', category: 'Кофе и Чай', emoji: '🥛', sales: 0, price: 130 },
+  { id: 17, name: 'Американо', category: 'Кофе и Чай', emoji: '☕', sales: 0, price: 90 },
+  { id: 18, name: 'Флэт уайт', category: 'Кофе и Чай', emoji: '🤍', sales: 0, price: 140 },
+  { id: 19, name: 'Раф', category: 'Кофе и Чай', emoji: '☕', sales: 0, price: 150 },
+  { id: 20, name: 'Кофе на песке', category: 'Кофе и Чай', emoji: '🏖️', sales: 0, price: 200 },
+  { id: 21, name: 'Чай пакетированный', category: 'Кофе и Чай', emoji: '🍵', sales: 0, price: 60 },
+  { id: 22, name: 'Лавандовый раф', category: 'Кофе и Чай', emoji: '💜', sales: 0, price: 170 },
+  { id: 23, name: 'Облепиховый чай', category: 'Кофе и Чай', emoji: '🍊', sales: 0, price: 150 },
   
-  { id: 24, name: 'Шоколадный кекс', category: 'Сладкое', emoji: '🧁', sales: 0 },
-  { id: 25, name: 'Армянская пахлава', category: 'Сладкое', emoji: '🍯', sales: 0 },
-  { id: 26, name: 'Чизкейк классический', category: 'Сладкое', emoji: '🍰', sales: 0 },
-  { id: 27, name: 'Чизкейк шоколадный', category: 'Сладкое', emoji: '🍫', sales: 0 },
-  { id: 28, name: 'Наполеон', category: 'Сладкое', emoji: '🎂', sales: 0 },
-  { id: 29, name: 'Медовик', category: 'Сладкое', emoji: '🍯', sales: 0 },
-  { id: 30, name: 'Булочки с изюмом, маком', category: 'Сладкое', emoji: '🥐', sales: 0 },
-  { id: 31, name: 'Пончики', category: 'Сладкое', emoji: '🍩', sales: 0 },
-  { id: 32, name: 'Сушки', category: 'Сладкое', emoji: '🥨', sales: 0 },
-  { id: 33, name: 'Печенье монетки', category: 'Сладкое', emoji: '🪙', sales: 0 },
-  { id: 34, name: 'Печенье с джемом', category: 'Сладкое', emoji: '🍓', sales: 0 },
-  { id: 35, name: 'Козинаки в шоколаде', category: 'Сладкое', emoji: '🍫', sales: 0 },
+  { id: 24, name: 'Шоколадный кекс', category: 'Сладкое', emoji: '🧁', sales: 0, price: 70 },
+  { id: 25, name: 'Армянская пахлава', category: 'Сладкое', emoji: '🍯', sales: 0, price: 100 },
+  { id: 26, name: 'Чизкейк классический', category: 'Сладкое', emoji: '🍰', sales: 0, price: 180 },
+  { id: 27, name: 'Чизкейк шоколадный', category: 'Сладкое', emoji: '🍫', sales: 0, price: 190 },
+  { id: 28, name: 'Наполеон', category: 'Сладкое', emoji: '🎂', sales: 0, price: 150 },
+  { id: 29, name: 'Медовик', category: 'Сладкое', emoji: '🍯', sales: 0, price: 140 },
+  { id: 30, name: 'Булочки с изюмом, маком', category: 'Сладкое', emoji: '🥐', sales: 0, price: 50 },
+  { id: 31, name: 'Пончики', category: 'Сладкое', emoji: '🍩', sales: 0, price: 60 },
+  { id: 32, name: 'Сушки', category: 'Сладкое', emoji: '🥨', sales: 0, price: 40 },
+  { id: 33, name: 'Печенье монетки', category: 'Сладкое', emoji: '🪙', sales: 0, price: 35 },
+  { id: 34, name: 'Печенье с джемом', category: 'Сладкое', emoji: '🍓', sales: 0, price: 45 },
+  { id: 35, name: 'Козинаки в шоколаде', category: 'Сладкое', emoji: '🍫', sales: 0, price: 80 },
   
-  { id: 36, name: 'Твистер', category: 'Кухня', emoji: '🌯', sales: 0 },
-  { id: 37, name: 'Твистер де люкс', category: 'Кухня', emoji: '🌯', sales: 0 },
-  { id: 38, name: 'Бургер', category: 'Кухня', emoji: '🍔', sales: 0 },
-  { id: 39, name: 'Бургер де люкс', category: 'Кухня', emoji: '🍔', sales: 0 },
-  { id: 40, name: 'Картофель фри средний', category: 'Кухня', emoji: '🍟', sales: 0 },
-  { id: 41, name: 'Картофель фри большой', category: 'Кухня', emoji: '🍟', sales: 0 },
-  { id: 42, name: 'Комбо', category: 'Кухня', emoji: '🍽️', sales: 0 },
+  { id: 36, name: 'Твистер', category: 'Кухня', emoji: '🌯', sales: 0, price: 180 },
+  { id: 37, name: 'Твистер де люкс', category: 'Кухня', emoji: '🌯', sales: 0, price: 220 },
+  { id: 38, name: 'Бургер', category: 'Кухня', emoji: '🍔', sales: 0, price: 190 },
+  { id: 39, name: 'Бургер де люкс', category: 'Кухня', emoji: '🍔', sales: 0, price: 240 },
+  { id: 40, name: 'Картофель фри средний', category: 'Кухня', emoji: '🍟', sales: 0, price: 90 },
+  { id: 41, name: 'Картофель фри большой', category: 'Кухня', emoji: '🍟', sales: 0, price: 120 },
+  { id: 42, name: 'Комбо', category: 'Кухня', emoji: '🍽️', sales: 0, price: 350 },
   
-  { id: 43, name: 'Добрый кола', category: 'Напитки', emoji: '🥤', sales: 0 },
-  { id: 44, name: 'Азвкус сок', category: 'Напитки', emoji: '🧃', sales: 0 },
-  { id: 45, name: 'Аскания', category: 'Напитки', emoji: '💧', sales: 0 },
-  { id: 46, name: 'Вода негазированная святой источник', category: 'Напитки', emoji: '💧', sales: 0 },
+  { id: 43, name: 'Добрый кола', category: 'Напитки', emoji: '🥤', sales: 0, price: 70 },
+  { id: 44, name: 'Азвкус сок', category: 'Напитки', emoji: '🧃', sales: 0, price: 80 },
+  { id: 45, name: 'Аскания', category: 'Напитки', emoji: '💧', sales: 0, price: 60 },
+  { id: 46, name: 'Вода негазированная святой источник', category: 'Напитки', emoji: '💧', sales: 0, price: 50 },
 ];
 
 const CATEGORY_EMOJIS = {
@@ -104,6 +106,7 @@ const Index = () => {
 
   const stats = useMemo(() => {
     const totalSales = products.reduce((sum, p) => sum + p.sales, 0);
+    const totalRevenue = products.reduce((sum, p) => sum + (p.sales * p.price), 0);
     const topProducts = [...products].sort((a, b) => b.sales - a.sales).slice(0, 3);
     const categorySales = categories.map(cat => ({
       category: cat,
@@ -111,13 +114,49 @@ const Index = () => {
     }));
     const maxCategorySales = Math.max(...categorySales.map(c => c.sales), 1);
     
-    return { totalSales, topProducts, categorySales, maxCategorySales };
+    return { totalSales, totalRevenue, topProducts, categorySales, maxCategorySales };
   }, [products, categories]);
 
   const resetSales = () => {
     if (window.confirm('Сбросить все продажи?')) {
       setProducts(INITIAL_PRODUCTS);
     }
+  };
+
+  const exportToExcel = () => {
+    const exportData = products.map(p => ({
+      'Категория': p.category,
+      'Товар': p.name,
+      'Цена (₽)': p.price,
+      'Продано (шт)': p.sales,
+      'Выручка (₽)': p.sales * p.price
+    }));
+
+    const categorySummary = categories.map(cat => {
+      const catProducts = products.filter(p => p.category === cat);
+      return {
+        'Категория': cat,
+        'Товар': 'ИТОГО',
+        'Цена (₽)': '',
+        'Продано (шт)': catProducts.reduce((sum, p) => sum + p.sales, 0),
+        'Выручка (₽)': catProducts.reduce((sum, p) => sum + (p.sales * p.price), 0)
+      };
+    });
+
+    const totalRow = {
+      'Категория': 'ВСЕГО',
+      'Товар': '',
+      'Цена (₽)': '',
+      'Продано (шт)': stats.totalSales,
+      'Выручка (₽)': stats.totalRevenue
+    };
+
+    const ws = XLSX.utils.json_to_sheet([...exportData, {}, ...categorySummary, {}, totalRow]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Продажи');
+    
+    const date = new Date().toLocaleDateString('ru-RU').replace(/\./g, '-');
+    XLSX.writeFile(wb, `Продажи_пекарни_${date}.xlsx`);
   };
 
   return (
@@ -130,7 +169,7 @@ const Index = () => {
           <p className="text-gray-600 text-lg">Отслеживайте популярность каждого товара</p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-white/80 backdrop-blur-sm border-orange-200 shadow-lg animate-scale-in">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
@@ -141,7 +180,17 @@ const Index = () => {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2 bg-white/80 backdrop-blur-sm border-purple-200 shadow-lg animate-scale-in" style={{ animationDelay: '0.1s' }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-green-200 shadow-lg animate-scale-in" style={{ animationDelay: '0.05s' }}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-600">Выручка</span>
+                <Icon name="DollarSign" className="text-green-500" size={24} />
+              </div>
+              <p className="text-3xl font-heading font-bold text-green-600">{stats.totalRevenue.toLocaleString('ru-RU')} ₽</p>
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-2 bg-white/80 backdrop-blur-sm border-purple-200 shadow-lg animate-scale-in" style={{ animationDelay: '0.15s' }}>
             <CardContent className="p-6">
               <h3 className="font-heading font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <Icon name="Award" className="text-purple-500" size={20} />
@@ -211,9 +260,16 @@ const Index = () => {
             </Button>
           ))}
           <Button
+            onClick={exportToExcel}
+            className="whitespace-nowrap ml-auto gap-2 bg-green-500 hover:bg-green-600"
+          >
+            <Icon name="Download" size={16} />
+            Экспорт в Excel
+          </Button>
+          <Button
             variant="destructive"
             onClick={resetSales}
-            className="whitespace-nowrap ml-auto gap-2"
+            className="whitespace-nowrap gap-2"
           >
             <Icon name="RotateCcw" size={16} />
             Сбросить
@@ -234,14 +290,24 @@ const Index = () => {
                     <h3 className="font-medium text-gray-800 text-sm leading-tight mb-1">
                       {product.name}
                     </h3>
-                    <Badge variant="outline" className="text-xs bg-amber-50 border-amber-300 text-amber-700">
-                      {product.category}
-                    </Badge>
+                    <div className="flex gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-xs bg-amber-50 border-amber-300 text-amber-700">
+                        {product.category}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs bg-green-50 border-green-300 text-green-700 font-semibold">
+                        {product.price} ₽
+                      </Badge>
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <Badge className="bg-orange-500 hover:bg-orange-600 text-white font-heading text-lg px-3 py-1">
                       {product.sales}
                     </Badge>
+                    {product.sales > 0 && (
+                      <span className="text-xs text-green-600 font-semibold">
+                        {(product.sales * product.price).toLocaleString('ru-RU')} ₽
+                      </span>
+                    )}
                   </div>
                 </div>
                 
